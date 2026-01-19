@@ -1,0 +1,203 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body (SDIO + DMA + FatFs, single-init model)
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2026 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+#include "dma.h"
+#include "fatfs.h"
+#include "sdio.h"
+#include "usart.h"
+#include "gpio.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+#include <stdio.h>
+#include <string.h>
+#include "bsp_driver_sd.h"
+#include "ff.h"
+/* USER CODE END Includes */
+
+/* Private variables ---------------------------------------------------------*/
+/* USER CODE BEGIN PV */
+extern FATFS SDFatFS;
+extern FIL   SDFile;
+extern char  SDPath[4];
+
+/* debug / control flags (used by sd_diskio.c) */
+volatile uint8_t  g_sd_force_polling = 0;
+volatile uint32_t g_sd_rx_done = 0;
+volatile uint32_t g_sd_err = 0;
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
+void SystemClock_Config(void);
+static void FATFS_MountOpenOrDie(void);
+
+int main(void)
+{
+  HAL_Init();
+  SystemClock_Config();
+
+  MX_GPIO_Init();
+  MX_DMA_Init();
+  MX_USART2_UART_Init();
+  MX_SDIO_SD_Init();     /* SDIO peripheral only (NO BSP_SD_Init here) */
+  MX_FATFS_Init();      /* links diskio driver */
+
+  /* USER CODE BEGIN 2 */
+  FRESULT fr;
+  UINT bw;
+  uint32_t seq = 0;
+
+  printf("\r\n[BOOT] SDIO + DMA + FatFs (single-init model)\r\n");
+
+  /* 1) card detect (logical) */
+  if (BSP_SD_IsDetected() != SD_PRESENT)
+  {
+    printf("[SD] card not detected\r\n");
+    Error_Handler();
+  }
+
+  /* 2) mount filesystem
+   *  - disk_initialize() inside FatFs will call BSP_SD_Init()
+   *  - NO manual SD init here
+   */
+  FATFS_MountOpenOrDie();
+  printf("[FATFS] mounted & file ready\r\n");
+
+  /* 3) logging loop */
+  while (1)
+  {
+    char line[96];
+    uint32_t t = HAL_GetTick();
+    uint8_t  st = BSP_SD_GetCardState();
+    uint32_t err = HAL_SD_GetError(&hsd);
+
+    int n = snprintf(line, sizeof(line),
+                     "%lu,%lu,%u,0x%08lX\r\n",
+                     (unsigned long)t,
+                     (unsigned long)seq++,
+                     (unsigned)st,
+                     (unsigned long)err);
+
+    fr = f_write(&SDFile, line, (UINT)n, &bw);
+    if (fr != FR_OK || bw != (UINT)n)
+    {
+      printf("[FATFS] write fail fr=%d bw=%u err=0x%08lX\r\n",
+             (int)fr, (unsigned)bw, (unsigned long)HAL_SD_GetError(&hsd));
+      Error_Handler();
+    }
+
+    if ((seq % 50U) == 0U)
+    {
+      fr = f_sync(&SDFile);
+      if (fr != FR_OK)
+      {
+        printf("[FATFS] sync fail fr=%d err=0x%08lX\r\n",
+               (int)fr, (unsigned long)HAL_SD_GetError(&hsd));
+        Error_Handler();
+      }
+    }
+
+    HAL_Delay(100);
+  }
+  /* USER CODE END 2 */
+}
+
+/* -------------------------------------------------------------------------- */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  __HAL_RCC_PWR_CLK_ENABLE();
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI | RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 72;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
+  RCC_OscInitStruct.PLL.PLLQ = 3;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+    Error_Handler();
+
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+                              | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+    Error_Handler();
+}
+
+/* -------------------------------------------------------------------------- */
+static void FATFS_MountOpenOrDie(void)
+{
+  FRESULT fr;
+  UINT bw;
+
+  /* mount (no polling/DMA switching here) */
+  fr = f_mount(&SDFatFS, (TCHAR const*)SDPath, 1);
+  if (fr != FR_OK)
+  {
+    printf("[FATFS] mount fail fr=%d err=0x%08lX\r\n",
+           (int)fr, (unsigned long)HAL_SD_GetError(&hsd));
+    Error_Handler();
+  }
+
+  fr = f_open(&SDFile, "log.csv", FA_OPEN_ALWAYS | FA_WRITE);
+  if (fr != FR_OK)
+  {
+    printf("[FATFS] open fail fr=%d\r\n", (int)fr);
+    Error_Handler();
+  }
+
+  fr = f_lseek(&SDFile, f_size(&SDFile));
+  if (fr != FR_OK)
+  {
+    printf("[FATFS] lseek fail fr=%d\r\n", (int)fr);
+    Error_Handler();
+  }
+
+  if (f_size(&SDFile) == 0U)
+  {
+    const char *hdr = "t_ms,seq,card_state,hsd_err\r\n";
+    fr = f_write(&SDFile, hdr, strlen(hdr), &bw);
+    if (fr != FR_OK || bw != (UINT)strlen(hdr))
+    {
+      printf("[FATFS] header write fail fr=%d bw=%u\r\n",
+             (int)fr, (unsigned)bw);
+      Error_Handler();
+    }
+    f_sync(&SDFile);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+void Error_Handler(void)
+{
+  __disable_irq();
+  while (1) { }
+}
