@@ -7,10 +7,10 @@ using the STM32 SDIO peripheral with DMA support.
 
 ## Features
 
-- SDIO interface (SDHC)
+- SDIO interface (SDHC, 32GB sd card)
 - 4-bit wide data bus mode
 - DMA-based block read/write
-- FATFS integration
+- FAT32, no exFAT or NTFS
 - Tested on NUCLEO-F411RE hardware
 - Designed for continuous data logging  
   (currently time + dummy data only, no real-time sensors)
