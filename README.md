@@ -2,8 +2,8 @@
 
 SDIO + DMA based SD card logger on STM32 NUCLEO-F411RE.
 
-NUCLEO-F411RE의 data brief: https://www.st.com/resource/en/data_brief/nucleo-f411re.pdf
-내장 MCU datasheet: https://www.st.com/resource/en/datasheet/stm32f411re.pdf
+NUCLEO-F411RE의 data brief: https://www.st.com/resource/en/data_brief/nucleo-f411re.pdf   
+내장 MCU datasheet: https://www.st.com/resource/en/datasheet/stm32f411re.pdf   
 
 This project implements a high-speed and stable SD card logging system
 using the STM32 SDIO peripheral with DMA support.
