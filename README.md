@@ -54,7 +54,7 @@ using the STM32 SDIO peripheral with DMA support.
 - **SD Interface**: SDIO (4-bit wide)
 - **Clock**:
   - SDIO clock divider configured for safe initialization (PLLCLK = SDIOCLK = 48Mhz)
-    init 때는 400khz sdio clk 맞추기 위해 **ClockDiv = 118;**  
+    init 때는 400khz sdio clk 맞추기 위해 **ClockDiv = 118로 하는 레퍼런스 존재, but 필수 아님**  
   - Increased after card initialization for data transfer  
      SDIO_CK = SDIOCLK / (ClockDiv + 2), ClockDiv = 0 --> 2  
      main 중간에 변경을 위한 함수 호출함.
@@ -73,8 +73,28 @@ using the STM32 SDIO peripheral with DMA support.
     <img width="706" height="630" alt="image" src="https://github.com/user-attachments/assets/b66d57c6-3538-493e-9902-cd5851be9696" />
 
 ### Modified Codes
+- **hsd 는 SD_HandleTypeDef hsd; **
+- sdio.c 에서 선언됨, 나머지 파일들은 헤더에서 extern 으로 선언하여 사용
 
+---------
+**sdio.c -->> MX_SDIO_SD_INIT**: 
+  `hsd.Init.BusWide = SDIO_BUS_WIDE_4B 로 시작`
+  - 직후에 SDIO_BUS_WIDE_1B로 초기화   
+  - main에서 INIT 단계 끝나고 ** fs mount ** 이후에 다시 SDIO_BUS_WIDE_4B로 전환
+----------
+**sd_diskio.c -->> WriteStatus 는 polling 대체**
+  - `callback (interrupt) 발생 -> WriteStatus 변화`
 
+**sd_diskio.c -->> #define DISABLE_SD_INIT 주석 해제**
+ -  HAL 관련 코드, BSP 관련 코드, fatfs 관련 코드에서 SD inititalize가 중복으로 일어날 수 있음
+ -  ` SD 카드 초기화는 시스템 INIT(MX_SDIO_SD_Init / BSP_SD_Init)에서 한 번만 수행,`
+ -  `확실한 역할 분리를 위함`
+---------
+ -  이후 **STA_NOINIT**는 FatFs 레벨에서 디스크 접근을 허용하는 논리플래그
+ -  상태판단용으로 사용 중  
+
+- 실제 데이터 전송의 완료 및 에러 판단은 STA_NOINIT가 아니라 DMA 완료 콜백
+- `(BSP_SD_WriteCpltCallback, BSP_SD_ReadCpltCallback)과 에러 콜백(BSP_SD_ErrorCallback)에서 갱신되는 WriteStatus / ReadStatus 값`
 
 ## License
 
