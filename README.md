@@ -54,7 +54,7 @@ using the STM32 SDIO peripheral with DMA support.
 - **SD Interface**: SDIO (4-bit wide)
 - **Clock**:
   - SDIO clock divider configured for safe initialization (PLLCLK = SDIOCLK = 48Mhz)
-    init 때는 400khz sdio clk 맞추기 위해 * ClockDiv = 118;* 
+    init 때는 400khz sdio clk 맞추기 위해 **ClockDiv = 118;**  
   - Increased after card initialization for data transfer  
      SDIO_CK = SDIOCLK / (ClockDiv + 2), ClockDiv = 0 --> 2  
      main 중간에 변경을 위한 함수 호출함.
