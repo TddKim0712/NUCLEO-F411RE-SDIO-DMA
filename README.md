@@ -2,8 +2,12 @@
 
 SDIO + DMA based SD card logger on STM32 NUCLEO-F411RE.
 
+NUCLEO-F411RE의 data brief: https://www.st.com/resource/en/data_brief/nucleo-f411re.pdf
+내장 MCU datasheet: https://www.st.com/resource/en/datasheet/stm32f411re.pdf
+
 This project implements a high-speed and stable SD card logging system
 using the STM32 SDIO peripheral with DMA support.
+
 
 ## Features
 
@@ -13,7 +17,10 @@ using the STM32 SDIO peripheral with DMA support.
 - FAT32, no exFAT or NTFS
 - Tested on NUCLEO-F411RE hardware
 - Designed for continuous data logging  
-  (currently time + dummy data only, no real-time sensors)
+  (currently time + dummy data only, no real-time sensors yet)
+
+  현재는 매 루프마다 fwrite로 systick시간, seq 순서, 오류여부를 기록함.
+  
 
 ## Implementation Notes
 
@@ -25,6 +32,20 @@ using the STM32 SDIO peripheral with DMA support.
 - Based on STM32CubeIDE generated code  
   (status handling functions and variables are user-modified)
 - Different MCU/MPU targets may require user-side code adjustments
+
+### System Logic
+0. fatfs.c -> MX_FATFS_INIT 에서 sd_diskio.c 의 SD_Driver로 link (MX_FATFS_INIT -> FATFS_LinkDriver_EX, extern SD_Driver가 disk로 호출됨, disk_write --->>> SD_write)
+1. main | 센서 내부 계산 동작 -> 기록할 내용을 RAM에 저장
+2. 원하는 상황에 (ex. 버퍼가 다 찰 경우, up to user) main.c -> f_write
+3. f_write 내부 조건 만족시 DMA 까지 호출
+ff.c:        f_write()
+ff_gen_drv:  disk_write()
+sd_diskio.c: SD_write()
+bsp_driver:  BSP_SD_WriteBlocks_DMA()
+HAL:         HAL_SD_WriteBlocks_DMA()
+HW:          SDIO + DMA 전송
+
+  
 
 ## Hardware Configuration
 
