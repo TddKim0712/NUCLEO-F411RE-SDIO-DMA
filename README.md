@@ -34,16 +34,17 @@ using the STM32 SDIO peripheral with DMA support.
 - Different MCU/MPU targets may require user-side code adjustments
 
 ### System Logic
-0. fatfs.c -> MX_FATFS_INIT 에서 sd_diskio.c 의 SD_Driver로 link (MX_FATFS_INIT -> FATFS_LinkDriver_EX, extern SD_Driver가 disk로 호출됨, disk_write --->>> SD_write)
-1. main | 센서 내부 계산 동작 -> 기록할 내용을 RAM에 저장
-2. 원하는 상황에 (ex. 버퍼가 다 찰 경우, up to user) main.c -> f_write
-3. f_write 내부 조건 만족시 DMA 까지 호출
-ff.c:        f_write()
-ff_gen_drv:  disk_write()
-sd_diskio.c: SD_write()
-bsp_driver:  BSP_SD_WriteBlocks_DMA()
-HAL:         HAL_SD_WriteBlocks_DMA()
-HW:          SDIO + DMA 전송
+0. fatfs.c -> MX_FATFS_INIT 에서 sd_diskio.c 의 SD_Driver로 link  
+   (MX_FATFS_INIT -> FATFS_LinkDriver_EX, extern SD_Driver가 disk로 호출됨, disk_write --->>> SD_write)
+2. main | 센서 내부 계산 동작 -> 기록할 내용을 RAM에 저장
+3. 원하는 상황에 (ex. 버퍼가 다 찰 경우, up to user) main.c -> f_write
+4. f_write 내부 조건 만족시 DMA 까지 호출 
+ - `ff.c:         f_write()`
+ - `ff_gen_drv:   disk_write()`
+ - `sd_diskio.c:  SD_write()`
+ - `bsp_driver:  BSP_SD_WriteBlocks_DMA()`
+ - `HAL:         HAL_SD_WriteBlocks_DMA()`
+ - `HW:          SDIO + DMA 전송`
 
   
 
@@ -53,12 +54,15 @@ HW:          SDIO + DMA 전송
 - **SD Interface**: SDIO (4-bit wide)
 - **Clock**:
   - SDIO clock divider configured for safe initialization (PLLCLK = SDIOCLK = 48Mhz)
-  - Increased after card initialization for data transfer    SDIO_CK = SDIOCLK / (ClockDiv + 2), ClockDiv = 0 --> 2
+    init 때는 400khz sdio clk 맞추기 위해 * ClockDiv = 118;* 
+  - Increased after card initialization for data transfer  
+     SDIO_CK = SDIOCLK / (ClockDiv + 2), ClockDiv = 0 --> 2  
+     main 중간에 변경을 위한 함수 호출함.
     <img width="1564" height="510" alt="image" src="https://github.com/user-attachments/assets/f688a7f1-4236-4b88-829c-35359ab21861" />
 
 - **DMA**:
   - SDIO RX/TX connected to DMA controller
-  - Interrupt-driven transfer completion handling
+
 - **NVIC**:
   - SDIO global interrupt enabled
   - DMA stream interrupts enabled
@@ -67,6 +71,9 @@ HW:          SDIO + DMA 전송
   - External pull-ups required on CMD and DAT lines (SD card side)
  
     <img width="706" height="630" alt="image" src="https://github.com/user-attachments/assets/b66d57c6-3538-493e-9902-cd5851be9696" />
+
+### Modified Codes
+
 
 
 ## License
