@@ -96,6 +96,36 @@ using the STM32 SDIO peripheral with DMA support.
 - 실제 데이터 전송의 완료 및 에러 판단은 STA_NOINIT가 아니라 DMA 완료 콜백
 - `(BSP_SD_WriteCpltCallback, BSP_SD_ReadCpltCallback)과 에러 콜백(BSP_SD_ErrorCallback)에서 갱신되는 WriteStatus / ReadStatus 값`
 
+--------
+## 발생했던 문제들
+#### 1. sdio.c <-> stm32f4xx_hal_sd.c
+<img width="635" height="254" alt="image" src="https://github.com/user-attachments/assets/2c397bef-2ece-49db-bf05-e68fb92c6dad" />
+
+<img width="679" height="316" alt="image" src="https://github.com/user-attachments/assets/4138197c-23a4-4906-9094-1ab07df4e2f1" />   
+
+`위는 sdio.c의 MX_SDIO_SD_Init(void),  아래는 stm32f4xx_hal_sd.c의 HAL_SD_InitCard(SD_HandleTypeDef *hsd)`   
+
+`이 둘이 불일치할 경우 main 에서 mount 실패한다.`  
+`(+ clkdiv (클럭 속도 조절)의 경우 init 이후 main 도중에 바꿔도 작동 문제 없었다)`
+`많은 레퍼런스에서는 init clkdiv = 0x76 (=118), 전송 중에는 clkdiv를 0에 가깝게 설정한다`
+
+
+
+#### 2. Initialize 순서
+- HAL - SystemClock_Config - GPIO - (UART)  (기본 세팅)
+- DMA -> SDIO_SD -> FATFS
+
+
+  
+#### 3. 배선 - PCB 설계 시 참조
+- 다른 레퍼런스에서 언급하는 문제: CLK 이외 전부 pull-up 저항 직렬연결 필요
+- CLK 선은 짧아야 하며, GND 근처에 배치하기
+- CLK 선이 불가피하게 길 경우 저속 클럭을 사용
+
+- 
+4.  
+
+
 ## License
 
 This project is released under the MIT License.
