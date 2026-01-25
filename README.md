@@ -101,6 +101,7 @@ using the STM32 SDIO peripheral with DMA support.
 #### 1. sdio.c <-> stm32f4xx_hal_sd.c
 <img width="635" height="254" alt="image" src="https://github.com/user-attachments/assets/2c397bef-2ece-49db-bf05-e68fb92c6dad" />
 
+------------
 <img width="679" height="316" alt="image" src="https://github.com/user-attachments/assets/4138197c-23a4-4906-9094-1ab07df4e2f1" />   
 
 `위는 sdio.c의 MX_SDIO_SD_Init(void),  아래는 stm32f4xx_hal_sd.c의 HAL_SD_InitCard(SD_HandleTypeDef *hsd)`   
