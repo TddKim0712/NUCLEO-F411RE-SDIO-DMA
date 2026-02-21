@@ -4,6 +4,17 @@
   * @file           : main.c
   * @brief          : SDIO + FatFs (SAFE FLOW)
   *                  1bit init -> mount -> (optional) switch to 4bit
+  *
+  *                  added Sequential RAW data logging prototype
+  *                  1 extent = 4kB
+  *                  1 data packet = 64B (not fixed)
+  *
+  *                  Superblock Logging -> Navigate to Write Data sequentially, append-only
+  *
+  *                  BSP_driver_sd files are utilized, not modified
+  *                  No more usage of FATFS  related Libraries
+  *
+  *
   ******************************************************************************
   */
 /* USER CODE END Header */
@@ -29,7 +40,7 @@ extern SD_HandleTypeDef hsd;/* Includes ----------------------------------------
 #include "usart.h"
 #include "sdio.h"
 #include "fatfs.h"
-#include "dma.h"   
+#include "dma.h"
 
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
@@ -65,7 +76,7 @@ int main(void)
 
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_DMA_Init();       
+  MX_DMA_Init();
   MX_SDIO_SD_Init();    // SDIO 핀/인스턴스 세팅(핵심 init은 아래 HAL_SD_Init)
   MX_FATFS_Init();      // FatFs driver link
 
@@ -74,13 +85,12 @@ int main(void)
   /* ========================= */
   /* [BP1] SD CARD INIT (ONCE) */
   /* ========================= */
-  // BP1: 여기 걸고 hsd.Init.BusWide / ClockDiv 확인
+  // ✅ BP1: 여기 걸고 hsd.Init.BusWide / ClockDiv 확인
   if (HAL_SD_Init(&hsd) != HAL_OK)
     die("HAL_SD_Init", 1);
 
-  // 1bit 강제(원하면 명시적으로)
-  // (대부분 MX_SDIO_SD_Init에서 1bit로 시작하게 되어있음)
-  // HAL_SD_ConfigWideBusOperation(&hsd, SDIO_BUS_WIDE_1B);
+  // ( MX_SDIO_SD_Init에서 1bit로 시작하게 되어있음)
+  // HAL_SD_ConfigWideBusOperation(&hsd, SDIO_BUS_WIDE_1B);  sd diskio에서 이미 됨
 
   /* ===================== */
   /* [BP2] FATFS MOUNT      */
@@ -176,10 +186,10 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState   = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource  = RCC_PLLSOURCE_HSE;
 
-  // HSE=8MHz 
+  // HSE=8MHz 가정
   // VCO = 8/4*72 = 144MHz
   // SYSCLK = 144/2 = 72MHz
-  // PLL48CLK = 144/3 = 48MHz  (SDIO/USB 쪽)
+  // PLL48CLK = 144/3 = 48MHz  ✅ (SDIO/USB 쪽)
   RCC_OscInitStruct.PLL.PLLM = 4;
   RCC_OscInitStruct.PLL.PLLN = 72;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
@@ -193,8 +203,8 @@ void SystemClock_Config(void)
       RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource   = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider  = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2; //  APB1 36MHz
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1; //  APB2 72MHz
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2; // ✅ APB1 36MHz
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1; // ✅ APB2 72MHz
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
     Error_Handler();
